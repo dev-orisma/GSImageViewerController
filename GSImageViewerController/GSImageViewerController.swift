@@ -18,6 +18,7 @@ public struct GSImageInfo {
     public let image     : UIImage
     public let imageMode : ImageMode
     public var imageHD   : URL?
+    public var saveToFileName: String?
     
     public var contentMode : UIViewContentMode {
         return UIViewContentMode(rawValue: imageMode.rawValue)!
@@ -31,6 +32,12 @@ public struct GSImageInfo {
     public init(image: UIImage, imageMode: ImageMode, imageHD: URL?) {
         self.init(image: image, imageMode: imageMode)
         self.imageHD = imageHD
+    }
+    
+    public init(image: UIImage, imageMode: ImageMode, imageHD: URL?, saveToFileName: String? ) {
+        self.init(image: image, imageMode: imageMode)
+        self.imageHD = imageHD
+        self.saveToFileName = saveToFileName
     }
     
     func calculateRect(_ size: CGSize) -> CGRect {
@@ -80,24 +87,88 @@ open class GSTransitionInfo {
     
 }
 
-open class GSImageViewerController: UIViewController {
+open class GSImageViewerController: UIViewController, URLSessionDataDelegate, URLSessionDelegate, URLSessionTaskDelegate, URLSessionDownloadDelegate  {
     
     open let imageInfo      : GSImageInfo
     open var transitionInfo : GSTransitionInfo?
     
     fileprivate let imageView  = UIImageView()
     fileprivate let scrollView = UIScrollView()
+    fileprivate var loadingView = UIView()
+    fileprivate var progressView = UIProgressView()
+    fileprivate var progressLabel = UILabel()
+    fileprivate var saveButton = UIButton()
+    fileprivate var closeButton = UIButton()
+    public let screen_height = UIScreen.main.bounds.height
+    public let screen_width = UIScreen.main.bounds.width
     
-    fileprivate lazy var session: URLSession = {
-        let configuration = URLSessionConfiguration.ephemeral
-        return URLSession(configuration: configuration, delegate: nil, delegateQueue: OperationQueue.main)
-    }()
+ 
     
     // MARK: Initialization
+    var session : URLSession {
+        get {
+            let config = URLSessionConfiguration.background(withIdentifier: "\(Bundle.main.bundleIdentifier!).downloadImg")
+            
+            // Warning: If an URLSession still exists from a previous download, it doesn't create
+            // a new URLSession object but returns the existing one with the old delegate object attached!
+            return URLSession(configuration: config, delegate: self, delegateQueue: OperationQueue.main)
+        }
+    }
+    
     
     public init(imageInfo: GSImageInfo) {
         self.imageInfo = imageInfo
         super.init(nibName: nil, bundle: nil)
+    }
+    public func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
+        
+        
+        DispatchQueue.main.async() {
+            print("Run")
+            self.progressView.progress = Float(totalBytesWritten) / Float(totalBytesExpectedToWrite)
+            self.progressLabel.text = "Downloading \(String(totalBytesWritten)) / \(String(totalBytesExpectedToWrite)) bytes"
+        }
+    }
+    
+    public func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL ) {
+        
+        self.loadingView.isHidden = true
+        self.saveButton.isHidden = false
+        
+        do {
+            
+            if let filename = imageInfo.saveToFileName {
+                let paths = (NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true)[0] as NSString).appendingPathComponent(filename)
+                let localUrls = URL(fileURLWithPath: paths)
+                try FileManager.default.copyItem(at: location, to: localUrls)
+                
+                let imgURL = UIImage(contentsOfFile: paths)
+                self.imageView.image = imgURL
+                self.view.layoutIfNeeded()
+            }
+            
+        }catch{
+            print("FileManagerError")
+        }
+        
+      
+        
+      
+    }
+    
+    public func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+        
+    }
+    
+    public func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        if error != nil {
+            print("Failed to download data")
+        }else {
+            print("Data downloaded")
+            
+        }
+        
+        session.invalidateAndCancel()
     }
     
     public convenience init(imageInfo: GSImageInfo, transitionInfo: GSTransitionInfo) {
@@ -132,7 +203,9 @@ open class GSImageViewerController: UIViewController {
         setupScrollView()
         setupImageView()
         setupGesture()
+        setupSaveButton()
         setupImageHD()
+       
         
         edgesForExtendedLayout = UIRectEdge()
         automaticallyAdjustsScrollViewInsets = false
@@ -168,6 +241,7 @@ open class GSImageViewerController: UIViewController {
         scrollView.addSubview(imageView)
     }
     
+    
     fileprivate func setupGesture() {
         let single = UITapGestureRecognizer(target: self, action: #selector(singleTap))
         let double = UITapGestureRecognizer(target: self, action: #selector(doubleTap(_:)))
@@ -182,24 +256,98 @@ open class GSImageViewerController: UIViewController {
             scrollView.addGestureRecognizer(pan)
         }
     }
+    fileprivate func setupSaveButton() {
+        self.saveButton = UIButton(frame: CGRect(x: screen_width - 60 , y: screen_height - 60, width: 50, height: 50))
+        self.saveButton.backgroundColor = .red
+        self.saveButton.setTitle("Save", for: .normal)
+        self.saveButton.addTarget(self, action: #selector(self.saveImg), for: .touchUpInside)
+        view.addSubview(self.saveButton)
+        
+        
+       
+
+        
+        self.loadingView = UIView(frame: CGRect(x: 0 , y: 0 , width: screen_width, height: screen_height))
+        self.loadingView.backgroundColor = UIColor(red: 0, green: 0, blue: 0, alpha: 0.6)
+        
+        
+        let posY = (screen_height / 2) - 2
+        
+        self.progressLabel = UILabel(frame: CGRect(x: 0 , y: posY - 30 , width: screen_width, height: 20))
+        self.progressLabel.text = "Downloading 0 / 0 byte"
+        self.progressLabel.textAlignment = .center
+        self.progressLabel.font = UIFont(name: "ThaiSansNeue-Italic", size: 20)
+        self.progressLabel.textColor = UIColor.white
+        self.loadingView.addSubview(self.progressLabel)
+        
+        
+        self.progressView = UIProgressView(frame: CGRect(x: 30 , y: posY , width: screen_width - 60, height: 20))
+        self.progressView.progressTintColor = UIColor.init(red: 186/255.0, green: 153/255.0, blue: 40/255.0, alpha: 1)
+        self.progressView.transform = self.progressView.transform.scaledBy(x: 1, y: 2)
+        self.loadingView.addSubview(self.progressView)
+        
+        
+        
+        
+        
+        
+        self.loadingView.isHidden = true
+        self.saveButton.isHidden = false
+        
+        view.addSubview(self.loadingView)
+        
+        self.closeButton  = UIButton(frame: CGRect(x: 10 , y: 10, width: 50, height: 50))
+        self.closeButton.backgroundColor = .red
+        self.closeButton.setTitle("Cls", for: .normal)
+        self.closeButton.addTarget(self, action: #selector(self.closePreview), for: .touchUpInside)
+        view.addSubview(self.closeButton)
+    }
     
-    fileprivate func setupImageHD() {
-        guard let imageHD = imageInfo.imageHD else { return }
-            
-        let request = URLRequest(url: imageHD, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 15)
-        let task = session.dataTask(with: request, completionHandler: { (data, response, error) -> Void in
-            guard let data = data else { return }
-            guard let image = UIImage(data: data) else { return }
-            self.imageView.image = image
-            self.view.layoutIfNeeded()
-        })
-        task.resume()
+    @objc fileprivate func  saveImg() {
+        if let uiimg = imageView.image {
+            UIImageWriteToSavedPhotosAlbum(uiimg,  self,  #selector(self.image(_:didFinishSavingWithError:contextInfo:)), nil)
+        }
+    }
+    
+    
+    
+    @objc fileprivate func closePreview() {
+        if navigationController == nil || (presentingViewController != nil && navigationController!.viewControllers.count <= 1) {
+            session.invalidateAndCancel()
+            dismiss(animated: true, completion: nil)
+        }
+    }
+    
+    @objc fileprivate func image(_ image: UIImage, didFinishSavingWithError error: Error?, contextInfo: UnsafeRawPointer) {
+        if let error = error {
+            print("Error")
+        } else {
+            let alert = UIAlertView(title: "Saved",
+                                    message: "Your image has been saved",
+                                    delegate: nil,
+                                    cancelButtonTitle: "Ok")
+            alert.show()
+        }
+    }
+
+    
+    public func setupImageHD() {
+        guard let imageHD = imageInfo.imageHD else {   return   }
+        
+        self.loadingView.isHidden = false
+        self.saveButton.isHidden = true
+//            let configuration = URLSessionConfiguration.background(withIdentifier: "\(Bundle.main.bundleIdentifier!).downloadImg")
+//            let session: URLSession = URLSession(configuration: configuration, delegate: self , delegateQueue: OperationQueue.main)
+            let request = URLRequest(url: imageHD, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 15)
+            let task = session.downloadTask(with: request)
+            task.resume()
     }
     
     // MARK: Gesture
     
     @objc fileprivate func singleTap() {
         if navigationController == nil || (presentingViewController != nil && navigationController!.viewControllers.count <= 1) {
+            session.invalidateAndCancel()
             dismiss(animated: true, completion: nil)
         }
     }
@@ -242,18 +390,15 @@ open class GSImageViewerController: UIViewController {
         switch gesture.state {
 
         case .began:
-            
             panViewOrigin = scrollView.center
             
         case .changed:
-            
             scrollView.center = getChanged()
             panViewAlpha = 1 - getProgress()
             view.backgroundColor = UIColor(white: 0.0, alpha: panViewAlpha)
             gesture.setTranslation(CGPoint.zero, in: nil)
 
         case .ended:
-            
             if getProgress() > 0.25 || getVelocity() > 1000 {
                 dismiss(animated: true, completion: nil)
             } else {
