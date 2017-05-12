@@ -287,10 +287,6 @@ open class GSImageViewerController: UIViewController, URLSessionDataDelegate, UR
         self.loadingView.addSubview(self.progressView)
         
         
-        
-        
-        
-        
         self.loadingView.isHidden = true
         self.saveButton.isHidden = false
         
