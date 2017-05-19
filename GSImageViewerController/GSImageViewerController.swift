@@ -124,7 +124,7 @@ open class GSImageViewerController: UIViewController, URLSessionDataDelegate, UR
         
         
         DispatchQueue.main.async() {
-            print("Run")
+       
             self.progressView.progress = Float(totalBytesWritten) / Float(totalBytesExpectedToWrite)
             self.progressLabel.text = "Downloading \(String(totalBytesWritten)) / \(String(totalBytesExpectedToWrite)) bytes"
         }
@@ -164,7 +164,7 @@ open class GSImageViewerController: UIViewController, URLSessionDataDelegate, UR
         if error != nil {
             print("Failed to download data")
         }else {
-            print("Data downloaded")
+         
             
         }
         
@@ -292,7 +292,7 @@ open class GSImageViewerController: UIViewController, URLSessionDataDelegate, UR
         
         view.addSubview(self.loadingView)
         
-        self.closeButton  = UIButton(frame: CGRect(x: 10 , y: 10, width: 50, height: 50))
+        self.closeButton  = UIButton(frame: CGRect(x: screen_width -  55 , y: 15, width: 50, height: 50))
         self.closeButton.setImage(UIImage(named: "chat_pre_close"), for: .normal)
         self.closeButton.addTarget(self, action: #selector(self.closePreview), for: .touchUpInside)
         view.addSubview(self.closeButton)
