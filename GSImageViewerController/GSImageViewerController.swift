@@ -257,15 +257,11 @@ open class GSImageViewerController: UIViewController, URLSessionDataDelegate, UR
         }
     }
     fileprivate func setupSaveButton() {
-        self.saveButton = UIButton(frame: CGRect(x: screen_width - 45 , y: screen_height - 60, width: 26, height: 40))
+        self.saveButton = UIButton(frame: CGRect(x: screen_width - 85, y: screen_height - 60, width: 65, height: 34))
         self.saveButton.setImage(UIImage(named: "pic_pre_save"), for: .normal)
         
         self.saveButton.addTarget(self, action: #selector(self.saveImg), for: .touchUpInside)
         view.addSubview(self.saveButton)
-        
-        
-       
-
         
         self.loadingView = UIView(frame: CGRect(x: 0 , y: 0 , width: screen_width, height: screen_height))
         self.loadingView.backgroundColor = UIColor(red: 0, green: 0, blue: 0, alpha: 0.6)
@@ -292,8 +288,8 @@ open class GSImageViewerController: UIViewController, URLSessionDataDelegate, UR
         
         view.addSubview(self.loadingView)
         
-        self.closeButton  = UIButton(frame: CGRect(x: screen_width -  55 , y: 15, width: 50, height: 50))
-        self.closeButton.setImage(UIImage(named: "chat_pre_close"), for: .normal)
+        self.closeButton  = UIButton(frame: CGRect(x: screen_width -  73 , y: 30, width: 55, height: 27))
+        self.closeButton.setImage(UIImage(named: "chat_pre_close_inside"), for: .normal)
         self.closeButton.addTarget(self, action: #selector(self.closePreview), for: .touchUpInside)
         view.addSubview(self.closeButton)
     }
